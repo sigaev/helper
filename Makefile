@@ -6,6 +6,10 @@ DATADIR = $(PREFIX)/share/disper
 
 INSTALL = install
 
+default: install
+	$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	$(INSTALL) -m755 helper $(DESTDIR)$(BINDIR)
+
 all: disper disper.1
 
 install: disper disper.1 src/build.py.install

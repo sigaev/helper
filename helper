@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+
+import os
+from tkinter import *
+
+class Application( Frame ):
+	def cb_dpms( self ):
+		os.system(
+			'xset dpms 600 1200 1800'
+			if self.cb_dpms.state[ 0 ].get() else
+			'xset dpms 0 0 0' )
+
+	def cb_display( self ):
+		print( 'v[1]: ', self.cb_display.state[ 0 ].get() )
+
+	def cb_audio( self ):
+		mixer_cmd = '''amixer -c1 scontrols | cut -d\  -f4- | while read e; do
+	amixer -c1 sset $e %s
+done >/dev/null
+'''
+		if self.cb_audio.state[ 0 ].get():
+			os.system( mixer_cmd % 'on' )
+			f = open( self.cb_audio.fname, 'w' )
+			f.write(
+'''pcm.!default {
+	type hw
+	card 1
+	device 7
+}
+''' )
+			f.close()
+		else:
+			os.unlink( self.cb_audio.fname )
+			os.system( mixer_cmd % 'off' )
+	cb_audio.fname = os.getenv( 'HOME' ) + '/.asoundrc'
+
+	def cb_suspend( self ):
+		for x, y in zip( self.cb, ( 1, 0, 0 ) ):
+			if y != x.state[ 0 ].get():
+				x.state[ 0 ].set( y )
+				x()
+		os.system( 'sudo pm-suspend' )
+
+	for x in cb_dpms, cb_display, cb_audio:
+		x.state = []
+
+	def w_init_state( self ):
+		self.cb = self.cb_dpms, self.cb_display, self.cb_audio
+		for x in self.cb:
+			x.state.append( IntVar() )
+		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
+		self.cb_audio.state[ 0 ].set( os.access( self.cb_audio.fname, os.F_OK ) )
+
+	def w_create( self ):
+		for t, x in zip( ( 'DPMS', 'Extra display', 'HDMI audio' ), self.cb ):
+			Checkbutton( self, text=t, variable=x.state[ 0 ], command=x ).grid( sticky=W )
+		Button( self, text='Suspend', command=self.cb_suspend ).grid( sticky=W+E )
+
+	def __init__( self, master ):
+		Frame.__init__( self, master )
+		self.pack()
+		self.w_init_state()
+		self.w_create()
+
+root = Tk()
+root.title( 'Helper' )
+app = Application( master=root )
+app.mainloop()
