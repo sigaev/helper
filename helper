@@ -11,7 +11,10 @@ class Application( Frame ):
 			'xset dpms 0 0 0' )
 
 	def cb_display( self ):
-		print( 'v[1]: ', self.cb_display.state[ 0 ].get() )
+		os.system(
+			'disper -t left -e'
+			if self.cb_display.state[ 0 ].get() else
+			'disper -s' )
 
 	def cb_audio( self ):
 		mixer_cmd = '''amixer -c1 scontrols | cut -d\  -f4- | while read e; do
@@ -49,6 +52,7 @@ done >/dev/null
 		for x in self.cb:
 			x.state.append( IntVar() )
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
+		self.cb_display.state[ 0 ].set( not os.system( '[ 2 == `disper -l | wc -l` ]' ) )
 		self.cb_audio.state[ 0 ].set( os.access( self.cb_audio.fname, os.F_OK ) )
 
 	def w_create( self ):
