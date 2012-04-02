@@ -52,7 +52,7 @@ done >/dev/null
 		for x in self.cb:
 			x.state.append( IntVar() )
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
-		self.cb_display.state[ 0 ].set( not os.system( '[ 4 == `disper -l | wc -l` ]' ) )
+		self.cb_display.state[ 0 ].set( not os.system( 'disper -p | grep associated | grep -q ,' ) )
 		self.cb_audio.state[ 0 ].set( os.access( self.cb_audio.fname, os.F_OK ) )
 
 	def w_create( self ):
@@ -68,5 +68,6 @@ done >/dev/null
 
 root = Tk()
 root.title( 'Helper' )
+root.option_add( '*Font', 'Helvetica 18' )
 app = Application( master=root )
 app.mainloop()
