@@ -17,25 +17,23 @@ class Application( Frame ):
 			'disper -s' )
 
 	def cb_audio( self ):
-		mixer_cmd = '''amixer -c1 scontrols | cut -d\  -f4- | while read e; do
+		mixer_cmd = '''
+amixer -c1 scontrols | cut -d\  -f4- | while read e; do
 	amixer -c1 sset $e %s
 done >/dev/null
+pulseaudio --start --log-level=0
+{
+	s=%d
+	echo set-default-sink $s
+	pacmd list-sink-inputs | grep index | tr -d \  | cut -d: -f2 | while read e; do
+		echo move-sink-input $e $s
+	done
+} | pacmd >/dev/null
 '''
 		if self.cb_audio.state[ 0 ].get():
-			os.system( mixer_cmd % 'on' )
-			f = open( self.cb_audio.fname, 'w' )
-			f.write(
-'''pcm.!default {
-	type hw
-	card 1
-	device 7
-}
-''' )
-			f.close()
+			os.system( mixer_cmd % ( 'on', 1 ) )
 		else:
-			os.unlink( self.cb_audio.fname )
-			os.system( mixer_cmd % 'off' )
-	cb_audio.fname = os.getenv( 'HOME' ) + '/.asoundrc'
+			os.system( mixer_cmd % ( 'off', 0 ) )
 
 	def cb_suspend( self ):
 		for x, y in zip( self.cb, ( 1, 0, 0 ) ):
@@ -53,7 +51,7 @@ done >/dev/null
 			x.state.append( IntVar() )
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
 		self.cb_display.state[ 0 ].set( not os.system( 'disper -p | grep associated | grep -q ,' ) )
-		self.cb_audio.state[ 0 ].set( os.access( self.cb_audio.fname, os.F_OK ) )
+		self.cb_audio.state[ 0 ].set( not not os.system( "pulseaudio --start --log-level=0; pacmd stat | grep -q 'Default.sink.*0'" ) )
 
 	def w_create( self ):
 		for t, x in zip( ( 'DPMS', 'Extra display', 'HDMI audio' ), self.cb ):
