@@ -30,10 +30,8 @@ pulseaudio --start --log-level=0
 	done
 } | pacmd >/dev/null
 '''
-		if self.cb_audio.state[ 0 ].get():
-			os.system( mixer_cmd % ( 'on', 1 ) )
-		else:
-			os.system( mixer_cmd % ( 'off', 0 ) )
+		x = self.cb_audio.state[ 0 ].get()
+		os.system( mixer_cmd % ( 'on' if 1 == x else 'off', x ) )
 
 	def cb_suspend( self ):
 		for x, y in zip( self.cb, ( 1, 0, 0 ) ):
@@ -51,11 +49,18 @@ pulseaudio --start --log-level=0
 			x.state.append( IntVar() )
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
 		self.cb_display.state[ 0 ].set( not os.system( 'disper -p | grep associated | grep -q ,' ) )
-		self.cb_audio.state[ 0 ].set( not not os.system( "pulseaudio --start --log-level=0; pacmd stat | grep -q 'Default.sink.*0'" ) )
+		x = os.popen( 'pulseaudio --start --log-level=0; pacmd stat | grep Default.sink' )
+		y = x.read()
+		self.cb_audio.state[ 0 ].set( 0 if y.endswith( '0\n' ) else
+			1 if y.endswith( '7\n' ) else 2 )
+		x.close()
 
 	def w_create( self ):
-		for t, x in zip( ( 'DPMS', 'Extra display', 'HDMI audio' ), self.cb ):
+		for t, x in zip( ( 'DPMS', 'Extra display' ), self.cb ):
 			Checkbutton( self, text=t, variable=x.state[ 0 ], command=x ).grid( sticky=W )
+		for x, t in enumerate( ( 'Built-in audio', 'HDMI audio', 'Network audio' ) ):
+			Radiobutton( self, text=t, value=x,
+				variable=self.cb_audio.state[ 0 ], command=self.cb_audio ).grid( sticky=W )
 		Button( self, text='Suspend', command=self.cb_suspend ).grid( sticky=W+E )
 
 	def __init__( self, master ):
