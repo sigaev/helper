@@ -38,7 +38,7 @@ pulseaudio --start --log-level=0
 			if y != x.state[ 0 ].get():
 				x.state[ 0 ].set( y )
 				x()
-		os.system( 'sudo pm-suspend' )
+		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
 
 	for x in cb_dpms, cb_display, cb_audio:
 		x.state = []
