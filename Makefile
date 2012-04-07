@@ -7,12 +7,11 @@ DATADIR = $(PREFIX)/share/disper
 INSTALL = install
 
 default: install
-	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m755 helper $(DESTDIR)$(BINDIR)
 
 all: disper disper.1
 
-install: disper disper.1 src/build.py.install
+install: disper src/build.py.install
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m755 disper $(DESTDIR)$(BINDIR)
 	$(INSTALL) -d $(DESTDIR)$(DATADIR)/src
@@ -27,8 +26,6 @@ install: disper disper.1 src/build.py.install
 	$(INSTALL) -m644 src/plugins/*.py $(DESTDIR)$(DATADIR)/src/plugins
 	$(INSTALL) -d $(DESTDIR)$(DATADIR)/hooks
 	[ -d hooks ] && $(INSTALL) -m755 hooks/* $(DESTDIR)$(DATADIR)/hooks || echo "No hooks to install"
-	$(INSTALL) -d $(DESTDIR)$(PREFIX)/share/man/man1
-	$(INSTALL) -m444 disper.1 $(DESTDIR)$(PREFIX)/share/man/man1
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/share/pixmaps
 	$(INSTALL) -m644 disper.svg $(DESTDIR)$(PREFIX)/share/pixmaps
 	# overwrite system-dependant settings file
