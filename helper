@@ -16,20 +16,6 @@ class Application( Frame ):
 			if self.cb_display.state[ 0 ].get() else
 			'disper -s' )
 
-	def cb_audio( self ):
-		mixer_cmd = '''
-pulseaudio --start --log-level=0
-{
-	s=%d
-	echo set-default-sink $s
-	pacmd list-sink-inputs | grep index | tr -d \  | cut -d: -f2 | while read e; do
-		echo move-sink-input $e $s
-	done
-} | pacmd >/dev/null
-'''
-		x = self.cb_audio.state[ 0 ].get()
-		os.system( mixer_cmd % ( 'on' if 1 == x else 'off', x ) )
-
 	def cb_suspend( self ):
 		for x, y in zip( self.cb, ( 1, 0, 0 ) ):
 			if y != x.state[ 0 ].get():
@@ -37,27 +23,19 @@ pulseaudio --start --log-level=0
 				x()
 		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
 
-	for x in cb_dpms, cb_display, cb_audio:
+	for x in cb_dpms, cb_display:
 		x.state = []
 
 	def w_init_state( self ):
-		self.cb = self.cb_dpms, self.cb_display, self.cb_audio
+		self.cb = self.cb_dpms, self.cb_display
 		for x in self.cb:
 			x.state.append( IntVar() )
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
 		self.cb_display.state[ 0 ].set( not os.system( 'disper -p | grep associated | grep -q ,' ) )
-		x = os.popen( 'pulseaudio --start --log-level=0; pacmd stat | grep Default.sink' )
-		y = x.read()
-		self.cb_audio.state[ 0 ].set( 0 if y.endswith( '0\n' ) else
-			1 if y.endswith( '7\n' ) else 2 )
-		x.close()
 
 	def w_create( self ):
 		for t, x in zip( ( 'DPMS', 'Extra display' ), self.cb ):
 			Checkbutton( self, text=t, variable=x.state[ 0 ], command=x ).grid( sticky=W )
-		for x, t in enumerate( ( 'Built-in audio', 'HDMI audio', 'Network audio' ) ):
-			Radiobutton( self, text=t, value=x,
-				variable=self.cb_audio.state[ 0 ], command=self.cb_audio ).grid( sticky=W )
 		Button( self, text='Suspend', command=self.cb_suspend ).grid( sticky=W+E )
 
 	def __init__( self, master ):
