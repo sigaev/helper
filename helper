@@ -18,9 +18,6 @@ class Application( Frame ):
 
 	def cb_audio( self ):
 		mixer_cmd = '''
-amixer -c1 scontrols | cut -d\  -f4- | while read e; do
-	amixer -c1 sset $e %s
-done >/dev/null
 pulseaudio --start --log-level=0
 {
 	s=%d
