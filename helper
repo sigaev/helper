@@ -5,16 +5,20 @@ import subprocess
 from tkinter import *
 import types
 
+root = Tk()
+root.title( 'Helper' )
+root.option_add( '*Font', 'Helvetica 18' )
+
 def stateful( func ):
-	func.state = []
+	func.state = IntVar()
 	return func
 
 def tcb_display( self, i ):
 	cb = self.acb_display[ i ]
-	state = cb.state[ 0 ].get()
+	state = cb.state.get()
 	if state != 1 and os.system( 'xrandr -q | grep -q ^%s.connected' % cb.display ):
 		state = 1
-		cb.state[ 0 ].set( state )
+		cb.state.set( state )
 	os.system( 'xrandr --output LVDS-0 --auto --output %s ' % cb.display +
 			   ( '--auto --left-of LVDS-0',
 				 '--off',
@@ -24,7 +28,7 @@ class Application( Frame ):
 	@stateful
 	def cb_dpms( self ):
 		os.system( 'xset dpms 600 1200 1800'
-				   if self.cb_dpms.state[ 0 ].get() else
+				   if self.cb_dpms.state.get() else
 				   'xset dpms 0 0 0' )
 
 	def cb_kill( self ):
@@ -32,15 +36,15 @@ class Application( Frame ):
 
 	def cb_suspend( self ):
 		for cb, state in ( self.cb_dpms, 1 ),:
-			if state != cb.state[ 0 ].get():
-				cb.state[ 0 ].set( state )
+			if state != cb.state.get():
+				cb.state.set( state )
 				cb()
 		self.w_reset_state()
 		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
 		self.w_reset_state()
 
 	def w_reset_state( self ):
-		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
+		self.cb_dpms.state.set( not not os.system( 'xset q | grep -q Standby:.0' ) )
 		for cb in self.acb_display:
 			state = os.system(
 				'''
@@ -58,30 +62,27 @@ class Application( Frame ):
 				fi
 				''' % ( ( cb.display, ) * 2 ) ) // 256
 			assert 0 <= state < 3
-			cb.state[ 0 ].set( state )
+			cb.state.set( state )
 
 	def w_init_state( self ):
-		displays = [ x for x in ( x.split( ' ', 1 )[ 0 ]
-				for x in subprocess.getoutput( 'xrandr -q' ).split( '\n' ) )
-			if x not in ( '', 'VGA-0', 'LVDS-0', 'Screen' ) ]
-		def with_display( i, func ):
+		randr = subprocess.getoutput( 'xrandr -q' )
+		displays = [] if -1 == randr.find( 'LVDS-0' ) else \
+			[ x for x in ( x.split( ' ', 1 )[ 0 ] for x in randr.split( '\n' ) )
+				if x not in ( '', 'VGA-0', 'LVDS-0', 'Screen' ) ]
+		def displayful( i, func ):
 			func.display = displays[ i ]
-			return func
+			return types.MethodType( stateful( func ), self )
 		self.acb_display = tuple( map(
-			lambda i:
-				types.MethodType( with_display( i, stateful(
-					lambda self: tcb_display( self, i ) ) ), self ),
+			lambda i: displayful( i, lambda self: tcb_display( self, i ) ),
 			range( min( 2, len( displays ) ) ) ) )
-		for x in ( self.cb_dpms, ) + self.acb_display:
-			x.state.append( IntVar() )
 		self.w_reset_state()
 
 	def w_create( self ):
-		Checkbutton( self, text='DPMS', variable=self.cb_dpms.state[ 0 ],
+		Checkbutton( self, text='DPMS', variable=self.cb_dpms.state,
 					 command=self.cb_dpms ).grid( columnspan=3 )
 		for i, cb in enumerate( self.acb_display ):
 			for j, t in enumerate( ( 'L', 'N', 'R' ) ):
-				Radiobutton( self, text=t, value=j, variable=cb.state[ 0 ],
+				Radiobutton( self, text=t, value=j, variable=cb.state,
 							 command=cb ).grid( row=1 + i, column=j, sticky=W )
 		Button( self, text='Kill Pulse', command=self.cb_kill ).grid(
 			columnspan=3, sticky=W+E )
@@ -94,8 +95,5 @@ class Application( Frame ):
 		self.w_init_state()
 		self.w_create()
 
-root = Tk()
-root.title( 'Helper' )
-root.option_add( '*Font', 'Helvetica 18' )
 app = Application( master=root )
 app.mainloop()
