@@ -2,70 +2,82 @@
 
 import os
 from tkinter import *
+import types
+
+def stateful( func ):
+	func.state = []
+	return func
+
+def tcb_display( self, i ):
+	cb = self.acb_display[ i ]
+	state = cb.state[ 0 ].get()
+	if state != 1 and os.system( 'xrandr -q | grep -q ^DP-%d.connected' % i ):
+		state = 1
+		cb.state[ 0 ].set( state )
+	os.system( 'xrandr --output LVDS-0 --auto --output DP-%d ' % i +
+			   ( '--auto --left-of LVDS-0',
+				 '--off',
+				 '--auto --right-of LVDS-0' )[ state ] )
 
 class Application( Frame ):
+	@stateful
 	def cb_dpms( self ):
 		os.system( 'xset dpms 600 1200 1800'
 				   if self.cb_dpms.state[ 0 ].get() else
 				   'xset dpms 0 0 0' )
 
-	def cb_display( self ):
-		state = self.cb_display.state[ 0 ].get()
-		if state != 1 and os.system( 'xrandr -q | grep -q ^DP-1.connected' ):
-			state = 1
-			self.cb_display.state[ 0 ].set( state )
-		os.system( 'xrandr --output LVDS-0 --auto --output DP-1 ' +
-				   ( '--auto --left-of LVDS-0',
-					 '--off',
-					 '--auto --right-of LVDS-0' )[ state ] )
-
-	for x in cb_dpms, cb_display:
-		x.state = []
-
 	def cb_kill( self ):
 		os.system( 'pgrep pulseaudio | xargs -r kill' )
 
 	def cb_suspend( self ):
-		for x, y in zip( ( self.cb_dpms, ), ( 1, ) ):
-			if y != x.state[ 0 ].get():
-				x.state[ 0 ].set( y )
-				x()
+		for cb, state in ( self.cb_dpms, 1 ),:
+			if state != cb.state[ 0 ].get():
+				cb.state[ 0 ].set( state )
+				cb()
 		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
 		self.w_reset_state()
 
 	def w_reset_state( self ):
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
-		state = os.system(
-			'''
-			line=`xrandr -q | grep ^DP-1`
-			if [[ $line ]]; then
-				if grep -q 'discon.*+' <<<$line; then
-					xrandr --output LVDS-0 --auto --output DP-1 --off
-					exit 1
+		for i, cb in enumerate( self.acb_display ):
+			state = os.system(
+				'''
+				line=`xrandr -q | grep ^DP-%d`
+				if [[ $line ]]; then
+					if grep -q 'discon.*+' <<<$line; then
+						xrandr --output LVDS-0 --auto --output DP-%d --off
+						exit 1
+					fi
+					grep -q + <<<$line || exit 1
+					offset=`cut -d+ -f2 <<<$line`
+					exit $((2 * ! ! offset))
+				else
+					exit -1
 				fi
-				grep -q + <<<$line || exit 1
-				offset=`cut -d+ -f2 <<<$line`
-				exit $((2 * ! ! offset))
-			else
-				exit -1
-			fi
-			''' ) // 256
-		assert state < 3
-		self.cb_display.state[ 0 ].set( state )
+				''' % ( i, i ) ) // 256
+			assert 0 <= state < 3
+			cb.state[ 0 ].set( state )
 
 	def w_init_state( self ):
-		for x in self.cb_dpms, self.cb_display:
+		self.acb_display = tuple( map(
+			lambda i:
+				types.MethodType( stateful( lambda self: tcb_display( self, i ) ), self ),
+			range( 2 ) ) )
+		for x in ( self.cb_dpms, ) + self.acb_display:
 			x.state.append( IntVar() )
 		self.w_reset_state()
 
 	def w_create( self ):
 		Checkbutton( self, text='DPMS', variable=self.cb_dpms.state[ 0 ],
-					 command=self.cb_dpms ).grid( sticky=W )
-		for i, t in enumerate( ( 'L', 'N', 'R' ) ):
-			Radiobutton( self, text=t, value=i, variable=self.cb_display.state[ 0 ],
-						 command=self.cb_display ).grid( sticky=W )
-		Button( self, text='Kill Pulse', command=self.cb_kill ).grid( sticky=W+E )
-		Button( self, text='Suspend', command=self.cb_suspend ).grid( sticky=W+E )
+					 command=self.cb_dpms ).grid( columnspan=3 )
+		for i, cb in enumerate( self.acb_display ):
+			for j, t in enumerate( ( 'L', 'N', 'R' ) ):
+				Radiobutton( self, text=t, value=j, variable=cb.state[ 0 ],
+							 command=cb ).grid( row=1 + i, column=j, sticky=W )
+		Button( self, text='Kill Pulse', command=self.cb_kill ).grid(
+			columnspan=3, sticky=W+E )
+		Button( self, text='Suspend', command=self.cb_suspend ).grid(
+			columnspan=3, sticky=W+E )
 
 	def __init__( self, master ):
 		Frame.__init__( self, master )
