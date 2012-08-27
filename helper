@@ -5,40 +5,65 @@ from tkinter import *
 
 class Application( Frame ):
 	def cb_dpms( self ):
-		os.system(
-			'xset dpms 600 1200 1800'
-			if self.cb_dpms.state[ 0 ].get() else
-			'xset dpms 0 0 0' )
+		os.system( 'xset dpms 600 1200 1800'
+				   if self.cb_dpms.state[ 0 ].get() else
+				   'xset dpms 0 0 0' )
 
 	def cb_display( self ):
-		os.system(
-			'disper -t left -e'
-			if self.cb_display.state[ 0 ].get() else
-			'disper -s' )
+		state = self.cb_display.state[ 0 ].get()
+		if state != 1 and os.system( 'xrandr -q | grep -q ^DP-1.connected' ):
+			state = 1
+			self.cb_display.state[ 0 ].set( state )
+		os.system( 'xrandr --output LVDS-0 --auto --output DP-1 ' +
+				   ( '--auto --left-of LVDS-0',
+					 '--off',
+					 '--auto --right-of LVDS-0' )[ state ] )
+
+	for x in cb_dpms, cb_display:
+		x.state = []
 
 	def cb_kill( self ):
 		os.system( 'pgrep pulseaudio | xargs -r kill' )
 
 	def cb_suspend( self ):
-		for x, y in zip( self.cb, ( 1, 0, 0 ) ):
+		for x, y in zip( ( self.cb_dpms, ), ( 1, ) ):
 			if y != x.state[ 0 ].get():
 				x.state[ 0 ].set( y )
 				x()
 		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
+		self.w_reset_state()
 
-	for x in cb_dpms, cb_display:
-		x.state = []
+	def w_reset_state( self ):
+		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
+		state = os.system(
+			'''
+			line=`xrandr -q | grep ^DP-1`
+			if [[ $line ]]; then
+				if grep -q 'discon.*+' <<<$line; then
+					xrandr --output LVDS-0 --auto --output DP-1 --off
+					exit 1
+				fi
+				grep -q + <<<$line || exit 1
+				offset=`cut -d+ -f2 <<<$line`
+				exit $((2 * ! ! offset))
+			else
+				exit -1
+			fi
+			''' ) // 256
+		assert state < 3
+		self.cb_display.state[ 0 ].set( state )
 
 	def w_init_state( self ):
-		self.cb = self.cb_dpms, self.cb_display
-		for x in self.cb:
+		for x in self.cb_dpms, self.cb_display:
 			x.state.append( IntVar() )
-		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
-		self.cb_display.state[ 0 ].set( not os.system( 'disper -p | grep associated | grep -q ,' ) )
+		self.w_reset_state()
 
 	def w_create( self ):
-		for t, x in zip( ( 'DPMS', 'Extra display' ), self.cb ):
-			Checkbutton( self, text=t, variable=x.state[ 0 ], command=x ).grid( sticky=W )
+		Checkbutton( self, text='DPMS', variable=self.cb_dpms.state[ 0 ],
+					 command=self.cb_dpms ).grid( sticky=W )
+		for i, t in enumerate( ( 'L', 'N', 'R' ) ):
+			Radiobutton( self, text=t, value=i, variable=self.cb_display.state[ 0 ],
+						 command=self.cb_display ).grid( sticky=W )
 		Button( self, text='Kill Pulse', command=self.cb_kill ).grid( sticky=W+E )
 		Button( self, text='Suspend', command=self.cb_suspend ).grid( sticky=W+E )
 
