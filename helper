@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import os
+import subprocess
 from tkinter import *
 import types
 
@@ -11,10 +12,10 @@ def stateful( func ):
 def tcb_display( self, i ):
 	cb = self.acb_display[ i ]
 	state = cb.state[ 0 ].get()
-	if state != 1 and os.system( 'xrandr -q | grep -q ^DP-%d.connected' % i ):
+	if state != 1 and os.system( 'xrandr -q | grep -q ^%s.connected' % cb.display ):
 		state = 1
 		cb.state[ 0 ].set( state )
-	os.system( 'xrandr --output LVDS-0 --auto --output DP-%d ' % i +
+	os.system( 'xrandr --output LVDS-0 --auto --output %s ' % cb.display +
 			   ( '--auto --left-of LVDS-0',
 				 '--off',
 				 '--auto --right-of LVDS-0' )[ state ] )
@@ -40,13 +41,13 @@ class Application( Frame ):
 
 	def w_reset_state( self ):
 		self.cb_dpms.state[ 0 ].set( not not os.system( 'xset q | grep -q Standby:.0' ) )
-		for i, cb in enumerate( self.acb_display ):
+		for cb in self.acb_display:
 			state = os.system(
 				'''
-				line=`xrandr -q | grep ^DP-%d`
+				line=`xrandr -q | grep ^%s`
 				if [[ $line ]]; then
 					if grep -q 'discon.*+' <<<$line; then
-						xrandr --output LVDS-0 --auto --output DP-%d --off
+						xrandr --output LVDS-0 --auto --output %s --off
 						exit 1
 					fi
 					grep -q + <<<$line || exit 1
@@ -55,15 +56,22 @@ class Application( Frame ):
 				else
 					exit -1
 				fi
-				''' % ( i, i ) ) // 256
+				''' % ( ( cb.display, ) * 2 ) ) // 256
 			assert 0 <= state < 3
 			cb.state[ 0 ].set( state )
 
 	def w_init_state( self ):
+		displays = [ x for x in ( x.split( ' ', 1 )[ 0 ]
+				for x in subprocess.getoutput( 'xrandr -q' ).split( '\n' ) )
+			if x not in ( '', 'VGA-0', 'LVDS-0', 'Screen' ) ]
+		def with_display( i, func ):
+			func.display = displays[ i ]
+			return func
 		self.acb_display = tuple( map(
 			lambda i:
-				types.MethodType( stateful( lambda self: tcb_display( self, i ) ), self ),
-			range( 2 ) ) )
+				types.MethodType( with_display( i, stateful(
+					lambda self: tcb_display( self, i ) ) ), self ),
+			range( min( 2, len( displays ) ) ) ) )
 		for x in ( self.cb_dpms, ) + self.acb_display:
 			x.state.append( IntVar() )
 		self.w_reset_state()
