@@ -43,6 +43,18 @@ class Application( Frame ):
 		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
 		self.w_reset_state()
 
+	def w_init_state( self ):
+		randr = subprocess.getoutput( 'xrandr -q' )
+		displays = [] if -1 == randr.find( 'LVDS-0' ) else \
+			[ x for x in ( x.split( ' ', 1 )[ 0 ] for x in randr.split( '\n' ) )
+				if x not in ( '', 'VGA-0', 'LVDS-0', 'Screen' ) ]
+		def displayful( i, func ):
+			func.display = displays[ i ]
+			return types.MethodType( stateful( func ), self )
+		self.acb_display = tuple( map(
+			lambda i: displayful( i, lambda self: tcb_display( self, i ) ),
+			range( min( 2, len( displays ) ) ) ) )
+
 	def w_reset_state( self ):
 		self.cb_dpms.state.set( not not os.system( 'xset q | grep -q Standby:.0' ) )
 		for cb in self.acb_display:
@@ -64,26 +76,13 @@ class Application( Frame ):
 			assert 0 <= state < 3
 			cb.state.set( state )
 
-	def w_init_state( self ):
-		randr = subprocess.getoutput( 'xrandr -q' )
-		displays = [] if -1 == randr.find( 'LVDS-0' ) else \
-			[ x for x in ( x.split( ' ', 1 )[ 0 ] for x in randr.split( '\n' ) )
-				if x not in ( '', 'VGA-0', 'LVDS-0', 'Screen' ) ]
-		def displayful( i, func ):
-			func.display = displays[ i ]
-			return types.MethodType( stateful( func ), self )
-		self.acb_display = tuple( map(
-			lambda i: displayful( i, lambda self: tcb_display( self, i ) ),
-			range( min( 2, len( displays ) ) ) ) )
-		self.w_reset_state()
-
 	def w_create( self ):
 		Checkbutton( self, text='DPMS', variable=self.cb_dpms.state,
 					 command=self.cb_dpms ).grid( columnspan=3 )
 		for i, cb in enumerate( self.acb_display ):
 			for j, t in enumerate( ( 'L', 'N', 'R' ) ):
 				Radiobutton( self, text=t, value=j, variable=cb.state,
-							 command=cb ).grid( row=1 + i, column=j, sticky=W )
+							 command=cb ).grid( row=1 + i, column=j )
 		Button( self, text='Kill Pulse', command=self.cb_kill ).grid(
 			columnspan=3, sticky=W+E )
 		Button( self, text='Suspend', command=self.cb_suspend ).grid(
@@ -93,6 +92,7 @@ class Application( Frame ):
 		Frame.__init__( self, master )
 		self.pack()
 		self.w_init_state()
+		self.w_reset_state()
 		self.w_create()
 
 app = Application( master=root )
