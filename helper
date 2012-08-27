@@ -34,6 +34,7 @@ class Application( Frame ):
 			if state != cb.state[ 0 ].get():
 				cb.state[ 0 ].set( state )
 				cb()
+		self.w_reset_state()
 		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
 		self.w_reset_state()
 
