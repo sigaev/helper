@@ -6,8 +6,8 @@ DATADIR = $(PREFIX)/share/disper
 
 INSTALL = install
 
-default: install
-	$(INSTALL) -m755 helper $(DESTDIR)$(BINDIR)
+default:
+	install -m755 -t/usr/local/bin helper
 
 all: disper disper.1
 
