@@ -40,7 +40,7 @@ class Application( Frame ):
 				cb.state.set( state )
 				cb()
 		self.w_reset_state()
-		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo pm-suspend' )
+		os.system( 'sudo /etc/init.d/cryptnmount restart; sudo /etc/local.d/pm-suspend' )
 		self.w_reset_state()
 
 	def w_init_state( self ):
